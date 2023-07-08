@@ -17,7 +17,7 @@ import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import jwt_decode from "jwt-decode";
 import { useFormik } from 'formik';
-import { loginSchema } from "@/validationSchema";
+// import { loginSchema } from "@/validationSchema";
 
 function Copyright(props) {
     return (
