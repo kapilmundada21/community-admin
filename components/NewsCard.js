@@ -9,7 +9,7 @@ function NewsCard({ news, pendingActionBtn, footer }) {
   const description = (news.description).slice(0, 250) + "....";
   return (
     <>
-      <Card sx={{ maxWidth: 345 }}>
+      <Card sx={{ maxWidth: 345 }} className="flex flex-col justify-between">
 
         <Link href={`/news/${news._id}`} target="_blank">
           <CardMedia
@@ -19,7 +19,7 @@ function NewsCard({ news, pendingActionBtn, footer }) {
           />
           <CardContent>
             <Typography gutterBottom variant="b" component="b" className="hover:underline">
-              {news.title}
+              {(news.title).slice(0, 100) + "..."}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }} dangerouslySetInnerHTML={{ __html: description}} />
           </CardContent>
@@ -29,13 +29,7 @@ function NewsCard({ news, pendingActionBtn, footer }) {
           footer &&
           <CardActions>
             <Button onClick={() => footer.handleEditNews(news)} variant="contained" className="bg-[#1565c0] w-1/2">Edit</Button>
-            <Button onClick={() =>
-              window.confirm(
-                "Do you want to delete this News?"
-              ) === true
-                ? footer.handleDeleteNews(news)
-                : ""
-            } variant="contained" className="bg-red-500 hover:bg-red-500 w-1/2">Delete</Button>
+            <Button onClick={() => footer.handleDeleteModel(news)} variant="contained" className="bg-red-500 hover:bg-red-500 w-1/2">Delete</Button>
           </CardActions>
         }
         {

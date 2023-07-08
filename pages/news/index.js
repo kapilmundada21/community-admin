@@ -1,3 +1,4 @@
+import Head from 'next/head';
 import React, { useState } from "react";
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
@@ -35,7 +36,7 @@ function a11yProps(index) {
   };
 }
 
-export default function Adminpanel() {
+export default function News() {
   const [value, setValue] = useState(0);
   const handleChange = (event, newValue) => {
     setValue(newValue);
@@ -43,7 +44,10 @@ export default function Adminpanel() {
 
   return (
     <div>
-      <Tabs value={value} onChange={handleChange} centered className="w-full -mt-6 py-5 fixed bg-white z-10">
+      <Head>
+        <title>{`News | ${process.env.NEXT_PUBLIC_WEBSITE_NAME}`}</title>
+      </Head>
+      <Tabs value={value} onChange={handleChange} centered className="w-full py-5 fixed bg-white z-10">
         <Tab label="All News" {...a11yProps(0)} />
         <Tab label="Pending News" {...a11yProps(1)} />
       </Tabs>

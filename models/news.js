@@ -6,6 +6,7 @@ const NewsSchema = new mongoose.Schema({
     img: { type: String },
     publishedBy: { type: String },
     status: { type: String, required: true, default: 'Pending' },
+    rejectionMessage: { type: String, default: null },
 }, { timestamps: true });
 
 mongoose.models = {}

@@ -120,7 +120,7 @@ export default function MiniDrawer({ children }) {
   const getLink = (index) => {
     switch (index) {
       case 0:
-        return "/adminpanel";
+        return "/accounts";
         break;
       case 1:
         return "/news";

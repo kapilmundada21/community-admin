@@ -2,7 +2,7 @@ import React from "react";
 import TextField from "@mui/material/TextField";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
-import { FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { FormControl, FormControlLabel, InputLabel, MenuItem, Radio, RadioGroup, Select } from "@mui/material";
 
 function CreateUser({ user, onFieldChange }) {
 
@@ -65,7 +65,41 @@ function CreateUser({ user, onFieldChange }) {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={2} sm={6} md={6}>
+          {
+            user.status === "Rejected" &&
+            <Grid item xs={2} sm={6} md={12}>
+              <TextField
+                required
+                id="rejectionMessage"
+                label="Rejection Message"
+                value={(user.rejectionMessage) ? user.rejectionMessage : ""}
+                variant="standard"
+                onChange={onFieldChange}
+                fullWidth
+                inputProps={{
+                  minLength: 2,
+                }}
+              />
+            </Grid>
+          }
+          <Grid item xs={2} sm={6} md={12}>
+            <FormControl className="space-x-4">
+              <RadioGroup
+                row
+                aria-labelledby="demo-row-radio-buttons-group-label"
+                id="setPasswordType"
+                name="setPasswordType"
+                value={(user.setPasswordType) ? user.setPasswordType : "mail"}
+                onChange={onFieldChange}
+              >
+                <FormControlLabel value="mail" control={<Radio />} label="send set password mail" />
+                <FormControlLabel value="password" control={<Radio />} label="set password" />
+              </RadioGroup>
+            </FormControl>
+          </Grid>
+          {
+            user.setPasswordType === "password" &&
+            <Grid item xs={2} sm={6} md={6}>
             <TextField
               required
               id="password"
@@ -79,7 +113,8 @@ function CreateUser({ user, onFieldChange }) {
                 minLength: 2,
               }}
             />
-          </Grid>
+            </Grid>
+          }
         </Grid>
       }
     </Box>

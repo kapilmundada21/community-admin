@@ -43,7 +43,7 @@ export default function Slug({ error, news, allNews }) {
                             Published By -  
                             <span className="text-blue-600"> {news.publishedBy}</span>
                         </span>
-                        <Image src={news.img} alt='' height={400} width={500} />
+                        <Image src={news.img} alt='' height={400} width={500} loading="lazy" />
                         <div dangerouslySetInnerHTML={{ __html: news.description }}></div>
                     </div>
                 </div>
@@ -73,7 +73,7 @@ export default function Slug({ error, news, allNews }) {
                             <Link href={`/news/${allNews[index]._id}`} target='_blank' className='text-blue-600' >
                                 <ListItemButton>
                                     <ListItemIcon>
-                                        <Image src={allNews[index].img} alt='' width={120} height={120} className='mr-2' />
+                                        <Image src={allNews[index].img} alt='' width={120} height={120} className='mr-2' loading="lazy" />
                                     </ListItemIcon>
                                     <ListItemText primary={allNews[index].title} className="hover:underline" />
                                 </ListItemButton>

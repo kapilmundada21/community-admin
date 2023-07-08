@@ -17,11 +17,15 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import Switch from "@mui/material/Switch";
 import { visuallyHidden } from "@mui/utils";
 import Fab from "@mui/material/Fab";
+import Fade from '@mui/material/Fade';
+import FilterListIcon from "@mui/icons-material/FilterList";
 import AddIcon from "@mui/icons-material/Add";
 import Tooltip from "@mui/material/Tooltip";
-import { CircularProgress, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { Button, CircularProgress, Divider, FormControl, IconButton, InputLabel, Menu, MenuItem, Radio, RadioGroup, Select } from "@mui/material";
 // -------------REQUIRED IMPORTS----------------------
+import axios from 'axios';
 import { useState, useEffect } from "react";
+import { useFormik } from 'formik';
 import Modal from "@/components/Modal";
 import EditAdmin from "@/components/Modals/EditAdmin";
 import CreateAdmin from "@/components/Modals/CreateAdmin";
@@ -46,10 +50,6 @@ function getComparator(order, orderBy) {
     : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
-// Since 2020 all major browsers ensure sort stability with Array.prototype.sort().
-// stableSort() brings sort stability to non-modern browsers (notably IE11). If you
-// only support modern browsers you can replace stableSort(exampleArray, exampleComparator)
-// with exampleArray.slice().sort(exampleComparator)
 function stableSort(array, comparator) {
   const stabilizedThis = array.map((el, index) => [el, index]);
   stabilizedThis.sort((a, b) => {
@@ -136,7 +136,17 @@ AdminSupervisorTableHead.propTypes = {
 };
 
 function AdminSupervisorTableToolbar(props) {
-  const { numSelected, handleCreateAdmin, adminType, handleAdminType } = props;
+  const { numSelected, handleCreateAdmin, adminType, handleAdminType, values, handleChange, handleSubmit } = props;
+
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const open = Boolean(anchorEl);
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = (e) => {
+    e.preventDefault();
+    setAnchorEl(null);
+  };
 
   return (
     <Toolbar
@@ -172,7 +182,68 @@ function AdminSupervisorTableToolbar(props) {
         </Typography>
       )}
 
-      <div className="flex space-x-8">
+      <div className="flex space-x-4 md:space-x-8">
+        <div title="Filters">
+          <IconButton
+            id="fade-button"
+            aria-controls={open ? 'fade-menu' : undefined}
+            aria-haspopup="true"
+            aria-expanded={open ? 'true' : undefined}
+            onClick={handleClick}
+          >
+            <FilterListIcon />
+          </IconButton>
+          <Menu
+            id="fade-menu"
+            MenuListProps={{
+              'aria-labelledby': 'fade-button',
+            }}
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleClose}
+            TransitionComponent={Fade}
+          >
+            <form onSubmit={(e) => { handleClose(e); handleSubmit(e) }} className="flex flex-col space-y-3 px-4 pt-2">
+              <FormControl className="space-x-4">
+                <Typography variant="span" component="span" className="font-semibold"> Sort By </Typography>
+                <RadioGroup
+                  row
+                  aria-labelledby="demo-row-radio-buttons-group-label"
+                  id="dbSortBy"
+                  name="dbSortBy"
+                  value={values.dbSortBy}
+                  onChange={handleChange}
+                >
+                  <FormControlLabel value="updatedAt" control={<Radio />} label="Last Updated" />
+                  <FormControlLabel value="createdAt" control={<Radio />} label="Created" />
+                  <FormControlLabel value="name" control={<Radio />} label="Name" />
+                </RadioGroup>
+              </FormControl>
+
+              <Divider />
+
+              <FormControl className="space-x-4">
+                <Typography variant="span" component="span" className="font-semibold"> Order By </Typography>
+                <RadioGroup
+                  row
+                  aria-labelledby="demo-row-radio-buttons-group-label"
+                  id="dbOrderBy"
+                  name="dbOrderBy"
+                  value={values.dbOrderBy}
+                  onChange={handleChange}
+                >
+                  <FormControlLabel value={1} control={<Radio />} label="Ascending" />
+                  <FormControlLabel value={-1} control={<Radio />} label="Descending" />
+                </RadioGroup>
+              </FormControl>
+
+              <Button variant="contained" type="submit" className="place-self-end w-min bg-[#1976d2]">
+                Apply
+              </Button>
+            </form>
+          </Menu>
+        </div>
+
         <FormControl>
           <InputLabel id="demo-simple-select-label">Type</InputLabel>
           <Select
@@ -187,6 +258,7 @@ function AdminSupervisorTableToolbar(props) {
             <MenuItem value="Supervisor">Supervisor</MenuItem>
           </Select>
         </FormControl>
+
         <Tooltip title={`Create ${adminType}`} className="bg-[#1565c0]">
           <Fab color="primary" aria-label="add">
             <AddIcon onClick={() => handleCreateAdmin()} />
@@ -206,13 +278,19 @@ export default function AdminSupervisorTable() {
   const [orderBy, setOrderBy] = React.useState("calories");
   const [selected, setSelected] = React.useState([]);
   const [page, setPage] = React.useState(0);
+  const [offset, setOffset] = React.useState(5);
+  const [totalAdmins, setTotalAdmins] = React.useState(0);
   const [dense, setDense] = React.useState(false);
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
+  const [rowsPerPage, setRowsPerPage] = React.useState(offset);
   // -------------divider----------------
   const [allAdmin, setAllAdmin] = useState([]);
-  const [openEditAdminModal, setOpenEditAdminModal] = useState(false);
-  const [adminType, setAdminType] = useState('Admin');
+  const [dbSortBy, setDbSortBy] = useState('updatedAt');
+  const [dbOrderBy, setDbOrderBy] = useState(-1);
+  const [pageVisited, setPageVisited] = useState([0]);
   const [openCreateAdminModal, setOpenCreateAdminModal] = useState(false);
+  const [openEditAdminModal, setOpenEditAdminModal] = useState(false);
+  const [openDeleteAdminModal, setOpenDeleteAdminModal] = useState(false);
+  const [adminType, setAdminType] = useState('Admin');
   const [loading, setLoading] = useState(true);
   const [rerenderComponent, setRerenderComponent] = useState(false);
   const [adminForModal, setAdminForModal] = useState({
@@ -223,15 +301,81 @@ export default function AdminSupervisorTable() {
 
   useEffect(() => {
     async function fetchData() {
-      let data = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/admin/get?type=${adminType}`);
-      let parsedData = await data.json();
-      let alladmins = parsedData.allAdmin;
-      await setAllAdmin(alladmins);
-      setLoading(false);
+      try {
+        const response = await axios.get(`/api/admin/get`, {
+          params: {
+            type: adminType,
+            page: page,
+            offset: offset,
+            sortBy: dbSortBy,
+            orderBy: dbOrderBy,
+          }
+        });
+
+        const parsedData = response.data;
+        const alladmins = parsedData.allAdmin;
+
+        await Promise.all([
+          setTotalAdmins(parsedData.totalAdmins),
+          setAllAdmin(Array.from(alladmins))
+        ]);
+
+        setLoading(false);
+      } catch (error) {
+        console.error(error)
+      }
     }
+
     fetchData();
     //eslint-disable-next-line
-  }, [rerenderComponent])
+  }, [rerenderComponent, offset])
+
+  const updateData = async (newPage) => {
+    try {
+      setLoading(true);
+
+      const response = await axios.get(`/api/admin/get`, {
+        params: {
+          type: adminType,
+          page: newPage,
+          offset: offset,
+          sortBy: dbSortBy,
+          orderBy: dbOrderBy,
+        }
+      });
+
+      const parsedData = response.data;
+      const alladmins = parsedData.allAdmin;
+
+      await Promise.all([
+        setTotalAdmins(parsedData.totalAdmins),
+        setAllAdmin(allAdmin.concat(Array.from(alladmins)))
+      ]);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setLoading(false);
+    }
+  };
+
+  const initialValues = {
+    dbSortBy,
+    dbOrderBy,
+  }
+
+  const { values, handleChange, handleSubmit } = useFormik({
+    initialValues: initialValues,
+    onSubmit: async (values) => {
+      setDbOrderBy(values.dbOrderBy)
+      setDbSortBy(values.dbSortBy)
+      setPageVisited([0])
+      setPage(0)
+      setAllAdmin([])
+      setLoading(true)
+      setRerenderComponent(!rerenderComponent)
+    }
+  })
 
   function createData(name, email, type, actionObject) {
     return {
@@ -263,11 +407,17 @@ export default function AdminSupervisorTable() {
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
+    if (!pageVisited.includes(newPage)) {
+      updateData(newPage)
+      pageVisited.push(newPage);
+    }
   };
 
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
+    setOffset(parseInt(event.target.value, 10))
     setPage(0);
+    setPageVisited([0]);
   };
 
   const handleChangeDense = (event) => {
@@ -290,49 +440,46 @@ export default function AdminSupervisorTable() {
     setOpenEditAdminModal(!openEditAdminModal);
   };
 
-  const handleEditAdminSave = (e, adminObj) => {
+  const handleEditAdminSave = async (e, adminObj) => {
     e.preventDefault();
-    fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/admin/patch`, {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      method: "PATCH",
 
-      // Fields that to be updated are passed
-      body: JSON.stringify(adminObj),
-    })
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (data) {
-        if (data.success) {
-          toast.success(`${adminObj.type} Updated Sucessfully!`, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-          setRerenderComponent(!rerenderComponent);
-          closeModal();
-        }
-        else {
-          toast.error(data.error, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
+    try {
+      const response = await axios.patch('/api/admin/patch', adminObj, {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
         }
       });
-  };
-  // -----End EditAdmin modal functions-----
+
+      const data = response.data;
+
+      if (data.success) {
+        toast.success(`${adminObj.type} Updated Successfully!`, {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined
+        });
+        setRerenderComponent(!rerenderComponent);
+        closeModal();
+      } else {
+        toast.error(data.error, {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined
+        });
+      }
+    } catch (error) {
+      console.error('Error updating admin:', error);
+    }
+  }; // -----End EditAdmin modal functions-----
 
   // -----Start CreateAdmin modal functions-----
   const handleCreateAdmin = () => {
@@ -340,100 +487,134 @@ export default function AdminSupervisorTable() {
       name: "",
       email: "",
       type: "",
+      setPasswordType: "mail",
       password: "",
     });
     setOpenCreateAdminModal(!openCreateAdminModal);
   };
 
-  const handleCreateAdminNew = (e, adminObj) => {
+  const handleCreateAdminNew = async (e, adminObj) => {
     e.preventDefault();
-    fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/admin/post`, {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      method: "POST",
 
-      // Fields that to be updated are passed
-      body: JSON.stringify(adminObj),
-    })
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (data) {
+    try {
+      const response = await axios.post('/api/admin/post', adminObj, {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = response.data;
+
+      if (data.success) {
+        toast.success(`${adminObj.type} Created Successfully!`, {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined
+        });
+        setRerenderComponent(!rerenderComponent);
+        closeModal();
+        
+        // send mail to admin/supervisor
+        if(adminObj.setPasswordType === "mail"){
+          const emailData = {
+            to: data.admin.email,
+            token: data.admin.setPasswordToken,
+          };
+          try {
+            const emailResponse = await axios.post(`/api/mail/setUserPassword`, emailData, {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+          } catch (error) {
+            console.error('Error sending set password mail:', error);
+          }
+        }
+
+      } else {
+        toast.error(data.error, {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined
+        });
+      }
+    } catch (error) {
+      console.error('Error creating admin:', error);
+    }
+  }; // -----End CreateAdmin modal functions-----
+
+  // -----Start Delete Admin modal functions-----
+  const handleDeleteAdminModel = (adminObj) => {
+    setAdminForModal({
+      name: "",
+      email: "",
+      type: "",
+      password: "",
+      ...adminObj
+    });
+    setOpenDeleteAdminModal(!openDeleteAdminModal);
+  };
+
+  const handleDeleteAdmin = (e, adminObj) => {
+    e.preventDefault();
+
+    const id = adminObj._id;
+
+    axios.delete(`/api/admin/delete?id=${id}`)
+      .then((response) => {
+        const data = response.data;
+
         if (data.success) {
-          toast.success(`${adminObj.type} Created Sucessfully!`, {
-            position: "top-right",
+          setAllAdmin(allAdmin.filter((admin) => admin._id !== adminObj._id));
+          setTotalAdmins(totalAdmins - 1);
+          toast.success(`${adminObj.type} Deleted Successfully!`, {
+            position: 'top-right',
             autoClose: 3000,
             hideProgressBar: false,
             closeOnClick: true,
             pauseOnHover: true,
             draggable: true,
-            progress: undefined,
+            progress: undefined
           });
           setRerenderComponent(!rerenderComponent);
           closeModal();
         } else {
           toast.error(data.error, {
-            position: "top-right",
+            position: 'top-right',
             autoClose: 3000,
             hideProgressBar: false,
             closeOnClick: true,
             pauseOnHover: true,
             draggable: true,
-            progress: undefined,
+            progress: undefined
           });
         }
       })
-      .catch((err) => {
-        console.error(err);
+      .catch((error) => {
+        console.error('Error deleting admin:', error);
       });
-  };
-  // -----End CreateAdmin modal functions-----
-
-  const handleDeleteAdmin = (adminObj) => {
-    let id = adminObj._id;
-    fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/admin/delete?id=${id}`, {
-      method: "DELETE"
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setAllAdmin(allAdmin.filter((admin) => admin._id !== adminObj._id));
-          toast.success(`${adminObj.type} Deleted Sucessfully!`, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-        }
-        else {
-          toast.error(data.error, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-        }
-      })
-  };
+  }; // -----End Delete Admin modal functions-----
 
   // -----Start Modal handlers-----
   const closeModal = () => {
     setAdminForModal({});
     setOpenEditAdminModal(false);
     setOpenCreateAdminModal(false);
+    setOpenDeleteAdminModal(false);
   };
 
   const handleAdminChange = (e) => {
-    if (e.target.name === "type") {
-      setAdminForModal({ ...adminForModal, type: e.target.value });
+    if (e.target.name) {
+      setAdminForModal({ ...adminForModal, [e.target.name]: e.target.value });
     }
     else {
       setAdminForModal({ ...adminForModal, [e.target.id]: e.target.value });
@@ -473,14 +654,27 @@ export default function AdminSupervisorTable() {
           <CreateAdmin admin={adminForModal} onFieldChange={handleAdminChange} />
         </Modal>
       )}
+      {openDeleteAdminModal && (
+        <Modal
+          title="Conform Delete"
+          endTitle="Delete"
+          handleSubmit={(e) => handleDeleteAdmin(e, adminForModal)}
+          onClose={closeModal}
+          showmodal={openDeleteAdminModal}
+          hasfooter={"true"}
+        />
+      )}
 
       <Box sx={{ width: "100%" }}>
-        <Paper sx={{ width: "100%", mb: 2 }}>
+        <Paper sx={{ width: "100%", mb: 2 }} className='p-3 mt-3'>
           <AdminSupervisorTableToolbar
             numSelected={selected.length}
             handleCreateAdmin={handleCreateAdmin}
             handleAdminType={handleAdminType}
             adminType={adminType}
+            values={values}
+            handleChange={handleChange}
+            handleSubmit={handleSubmit}
           />
           <TableContainer>
             <Table
@@ -531,25 +725,19 @@ export default function AdminSupervisorTable() {
                             />
                             <MdDeleteForever
                               className="cursor-pointer"
-                              onClick={() =>
-                                window.confirm(
-                                  "Do you want to delete this User?"
-                                ) === true
-                                  ? handleDeleteAdmin(row.actionObject)
-                                  : ""
-                              }
+                              onClick={() => handleDeleteAdminModel(row.actionObject)}
                             />
                           </div>
                         </TableCell>
                       </TableRow>
                     );
-                  }) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      No data available
-                    </TableCell>
-                  </TableRow>
-                )}
+                  }) : !loading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center">
+                        No data available
+                      </TableCell>
+                    </TableRow>
+                  )}
                 {UsertyRows > 0 && (
                   <TableRow
                     style={{
@@ -570,7 +758,7 @@ export default function AdminSupervisorTable() {
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={rows.length}
+            count={totalAdmins}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}

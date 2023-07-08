@@ -65,7 +65,25 @@ function EditUser({ user, onFieldChange }) {
               </Select>
             </FormControl>
           </Grid>
-        </Grid>}
+          {
+            user.status === "Rejected" &&
+            <Grid item xs={2} sm={6} md={12}>
+              <TextField
+                required
+                id="rejectionMessage"
+                label="Rejection Message"
+                value={(user.rejectionMessage) ? user.rejectionMessage : ""}
+                variant="standard"
+                onChange={onFieldChange}
+                fullWidth
+                inputProps={{
+                  minLength: 2,
+                }}
+              />
+            </Grid>
+          }
+        </Grid>
+      }
     </Box>
   );
 }

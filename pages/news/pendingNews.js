@@ -1,8 +1,9 @@
+import axios from 'axios';
 import Grid from "@mui/material/Grid";
 import NewsCard from "@/components/NewsCard";
 import Modal from "@/components/Modal";
 import { useEffect, useState } from 'react';
-import { CircularProgress } from '@mui/material';
+import { CircularProgress, TextareaAutosize } from '@mui/material';
 import InfiniteScroll from "react-infinite-scroll-component";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -21,125 +22,140 @@ export default function PendingNews() {
         img: "",
         publishedBy: "",
         status: "",
+        rejectionMessage: "",
     });
 
     useEffect(() => {
         async function fetchData() {
-            let URL = `${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/get?status=Pending&page=${page}&offset=${offset}`
-            let data = await fetch(URL);
-            let parsedData = await data.json();
-            await setAllNews(Array.from(parsedData.allNews));
-            await setTotalNews(parsedData.totalNews);
-            setLoading(false);
+            try {
+                const response = await axios.get(`/api/news/get`, {
+                    params: {
+                        status: 'Pending',
+                        page: page,
+                        offset: offset
+                    }
+                });
+                const parsedData = response.data;
+
+                await Promise.all([
+                    setAllNews(Array.from(parsedData.allNews)),
+                    setTotalNews(parsedData.totalNews)
+                ]);
+
+                setLoading(false);
+            } catch (error) {
+                console.error(error);
+            }
         }
         fetchData();
         //eslint-disable-next-line
     }, [rerenderComponent])
 
     const updateData = async () => {
-        setLoading(true);
-        let url = `${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/get?status=Pending&page=${page + 1}&offset=${offset}`;
-        setPage(page + 1);
-        let data = await fetch(url);
-        let parsedData = await data.json();
-        setAllNews(allNews.concat(Array.from(parsedData.allNews)));
-        setTotalNews(parsedData.totalNews);
-        setLoading(false);
+        try {
+            setLoading(true);
+            setPage(page + 1);
+            const response = await axios.get(`/api/news/get?status=Pending&page=${page + 1}&offset=${offset}`);
+            const parsedData = response.data;
+            setAllNews(allNews.concat(Array.from(parsedData.allNews)));
+            setTotalNews(parsedData.totalNews);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setLoading(false);
+        }
+    };
+
+    const handleApprovedNews = async (e, newsObj) => {
+        e.preventDefault();
+        try {
+            const response = await axios.patch('/api/news/patch', {
+                ...newsObj,
+                status: 'Approved',
+            }, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = response.data;
+            if (data.success) {
+                toast.success('News Approved Successfully!', {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+                setRerenderComponent(!rerenderComponent);
+                setPage(0);
+                closeModal();
+            } else {
+                toast.error(data.error, {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+            }
+        } catch (error) {
+            console.error('Error approving news:', error);
+        }
+    };
+
+    const handleRejectNews = async (e, newsObj) => {
+        e.preventDefault();
+        try {
+            const response = await axios.patch('/api/news/patch', {
+                ...newsObj,
+                status: 'Rejected',
+            }, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = response.data;
+            if (data.success) {
+                toast.success('News Rejected Successfully!', {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+                setRerenderComponent(!rerenderComponent);
+                setPage(0);
+                closeModal();
+            } else {
+                toast.error(data.error, {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+            }
+        } catch (error) {
+            console.error('Error rejecting news:', error);
+        }
+    };
+
+    const handleRejectionMessage = (e) => {
+        setCurrentNews({
+            ...currentNews,
+            rejectionMessage: e.target.value,
+        });
     }
-
-    const handleApprovedNews = (e, newsObj) => {
-        e.preventDefault();
-        fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/patch`, {
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-            },
-            method: "PATCH",
-
-            // Fields that to be updated are passed
-            body: JSON.stringify({
-                ...newsObj,
-                status: "Approved",
-            })
-        })
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (data) {
-                if (data.success) {
-                    toast.success("News Approved Sucessfully!", {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                    setRerenderComponent(!rerenderComponent);
-                    setPage(0);
-                    closeModal();
-                }
-                else {
-                    toast.error(data.error, {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                }
-            })
-    };
-
-    const handleRejectNews = (e, newsObj) => {
-        e.preventDefault();
-        fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/patch`, {
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-            },
-            method: "PATCH",
-
-            // Fields that to be updated are passed
-            body: JSON.stringify({
-                ...newsObj,
-                status: "Rejected",
-            })
-        })
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (data) {
-                if (data.success) {
-                    toast.success("News Rejected Sucessfully!", {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                    setRerenderComponent(!rerenderComponent);
-                    setPage(0);
-                    closeModal();
-                }
-                else {
-                    toast.error(data.error, {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                }
-            })
-    };
 
     const closeModal = () => {
         setOpenModal(false);
@@ -149,6 +165,7 @@ export default function PendingNews() {
             img: "",
             publishedBy: "",
             status: "",
+            rejectionMessage: "",
         })
     };
 
@@ -163,16 +180,24 @@ export default function PendingNews() {
         <>
             {openModal && (
                 <Modal
-                    title="Confirm Reject News"
-                    endTitle="Confirm"
+                    title="News Rejection Message"
+                    endTitle="Reject News"
                     handleSubmit={(e) => { handleRejectNews(e, currentNews) }}
                     onClose={closeModal}
                     showmodal={openModal}
                     hasfooter={"true"}
                 >
+                    <TextareaAutosize
+                        minRows={4}
+                        placeholder="Rejection Message..."
+                        value={(currentNews.rejectionMessage) ? currentNews.rejectionMessage : ""}
+                        onChange={handleRejectionMessage}
+                        required
+                        className="w-full p-2"
+                    />
                 </Modal>
             )}
-            
+
             <div className="mt-12">
                 <InfiniteScroll
                     dataLength={(page + 1) * offset}
@@ -194,7 +219,7 @@ export default function PendingNews() {
 
 
                 {
-                    !(allNews.length) &&
+                    !(allNews.length) && !loading &&
                     <div className='md:pt-16 text-center'>
                         No data available
                     </div>

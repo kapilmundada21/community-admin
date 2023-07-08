@@ -6,6 +6,8 @@ const UserSchema = new mongoose.Schema({
     password: { type: String },
     status: { type: String, required: true, default: 'Pending' },
     resetPasswordToken : { type: String, },
+    setPasswordToken : { type: String, },
+    rejectionMessage: { type: String, default: null },
 }, { timestamps: true });
 
 mongoose.models = {}

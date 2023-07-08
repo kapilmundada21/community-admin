@@ -9,20 +9,30 @@ const findAllUsers = async (req, res) => {
 
 const findUserByStatus = async (req, res) => {
     const userStatus = req.query.status;
+    const { page, offset, sortBy, orderBy } = req.query;
+    const sortQuery = {};
+    sortQuery[sortBy] = orderBy;
+    let totalUsers = await User.countDocuments({ status: userStatus });
     let users = await User.find({ status: userStatus })
-    res.status(200).json({ success: true, allUser: users })
+                          .sort(sortQuery)
+                          .skip(page * offset)
+                          .limit(offset);
+    res.status(200).json({ success: true, allUser: users, totalUsers })
     return
 }
 
 const handler = async (req, res) => {
-    if (req.method == 'GET') {
-        let userStatus = req.query.status;
-        userStatus ? findUserByStatus(req, res) : findAllUsers(req, res);
-        return
+    
+    if (req.method !== 'GET') {
+        res.status(400).json({ error: "This method is not allowed" });
+        return;
     }
-    else {
-        res.status(400).json({ error: "This method is not allowed" })
-        return
+
+    const userStatus = req.query.status;
+    if (userStatus) {
+        await findUserByStatus(req, res);
+    } else {
+        await findAllUsers(req, res);
     }
 }
 export default connectDb(handler);

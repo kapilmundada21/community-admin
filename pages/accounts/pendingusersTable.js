@@ -14,19 +14,18 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import Paper from "@mui/material/Paper";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import Fade from '@mui/material/Fade';
 import Switch from "@mui/material/Switch";
 import { visuallyHidden } from "@mui/utils";
-import Fab from "@mui/material/Fab";
-import AddIcon from "@mui/icons-material/Add";
-import Tooltip from "@mui/material/Tooltip";
-import { CircularProgress, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
+import { Button, CircularProgress, Divider, FormControl, IconButton, Menu, Radio, RadioGroup, TextareaAutosize } from "@mui/material";
 // -------------REQUIRED IMPORTS----------------------
 import { useState, useEffect } from "react";
+import axios from 'axios';
+import { useFormik } from 'formik';
 import Modal from "@/components/Modal";
-import EditUser from "@/components/Modals/EditUser";
-import CreateUser from "@/components/Modals/CreateUser";
-import { AiFillEdit } from "react-icons/ai";
-import { MdDeleteForever } from "react-icons/md";
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -89,7 +88,7 @@ const headCells = [
   },
 ];
 
-function AllusersTableHead(props) {
+function PendingusersTableHead(props) {
   const { order, orderBy, onRequestSort } = props;
   const createSortHandler = (property) => (event) => {
     onRequestSort(event, property);
@@ -126,7 +125,7 @@ function AllusersTableHead(props) {
   );
 }
 
-AllusersTableHead.propTypes = {
+PendingusersTableHead.propTypes = {
   numSelected: PropTypes.number.isRequired,
   onRequestSort: PropTypes.func.isRequired,
   onSelectAllClick: PropTypes.func.isRequired,
@@ -135,8 +134,17 @@ AllusersTableHead.propTypes = {
   rowCount: PropTypes.number.isRequired,
 };
 
-function AllusersTableToolbar(props) {
-  const { numSelected, handleCreateUser, statusType, handleStatusType } = props;
+function PendingusersTableToolbar(props) {
+  const { numSelected, values, handleChange, handleSubmit } = props;
+  const [anchorEl, setAnchorEl] = React.useState(null);
+  const open = Boolean(anchorEl);
+  const handleClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+  const handleClose = (e) => {
+    e.preventDefault();
+    setAnchorEl(null);
+  };
 
   return (
     <Toolbar
@@ -168,71 +176,175 @@ function AllusersTableToolbar(props) {
           id="tableTitle"
           component="div"
         >
-          All Users
+          Pending Users
         </Typography>
       )}
 
-      <div className="flex space-x-8">
-        <FormControl>
-          <InputLabel id="demo-simple-select-label">Status</InputLabel>
-          <Select
-            labelId="demo-simple-select-label"
-            id="status"
-            name="status"
-            value={statusType}
-            label="Age"
-            onChange={handleStatusType}
-          >
-            <MenuItem value="Approved">Approved</MenuItem>
-            <MenuItem value="Pending">Pending</MenuItem>
-            <MenuItem value="Rejected">Rejected</MenuItem>
-          </Select>
-        </FormControl>
-        <Tooltip title="Create User" className="bg-[#1565c0]">
-          <Fab color="primary" aria-label="add">
-            <AddIcon onClick={() => handleCreateUser()} />
-          </Fab>
-        </Tooltip>
+      <div title="Filters" className="flex space-x-4 md:space-x-8">
+        <IconButton
+          id="fade-button"
+          aria-controls={open ? 'fade-menu' : undefined}
+          aria-haspopup="true"
+          aria-expanded={open ? 'true' : undefined}
+          onClick={handleClick}
+        >
+          <FilterListIcon />
+        </IconButton>
+        <Menu
+          id="fade-menu"
+          MenuListProps={{
+            'aria-labelledby': 'fade-button',
+          }}
+          anchorEl={anchorEl}
+          open={open}
+          onClose={handleClose}
+          TransitionComponent={Fade}
+        >
+          <form onSubmit={(e) => { handleClose(e); handleSubmit(e) }} className="flex flex-col space-y-3 px-4 pt-2">
+            <FormControl className="space-x-4">
+              <Typography variant="span" component="span" className="font-semibold"> Sort By </Typography>
+              <RadioGroup
+                row
+                aria-labelledby="demo-row-radio-buttons-group-label"
+                id="dbSortBy"
+                name="dbSortBy"
+                value={values.dbSortBy}
+                onChange={handleChange}
+              >
+                <FormControlLabel value="updatedAt" control={<Radio />} label="Last Updated" />
+                <FormControlLabel value="createdAt" control={<Radio />} label="Created" />
+                <FormControlLabel value="name" control={<Radio />} label="Name" />
+              </RadioGroup>
+            </FormControl>
+
+            <Divider />
+
+            <FormControl className="space-x-4">
+              <Typography variant="span" component="span" className="font-semibold"> Order By </Typography>
+              <RadioGroup
+                row
+                aria-labelledby="demo-row-radio-buttons-group-label"
+                id="dbOrderBy"
+                name="dbOrderBy"
+                value={values.dbOrderBy}
+                onChange={handleChange}
+              >
+                <FormControlLabel value={1} control={<Radio />} label="Ascending" />
+                <FormControlLabel value={-1} control={<Radio />} label="Descending" />
+              </RadioGroup>
+            </FormControl>
+
+            <Button variant="contained" type="submit" className="place-self-end w-min bg-[#1976d2]">
+              Apply
+            </Button>
+          </form>
+        </Menu>
       </div>
     </Toolbar>
   );
 }
 
-AllusersTableToolbar.propTypes = {
+PendingusersTableToolbar.propTypes = {
   numSelected: PropTypes.number.isRequired,
 };
 
-export default function AllusersTable() {
+export default function PendingusersTable() {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("calories");
   const [selected, setSelected] = React.useState([]);
   const [page, setPage] = React.useState(0);
+  const [offset, setOffset] = React.useState(5);
+  const [totalUsers, setTotalUsers] = React.useState(0);
   const [dense, setDense] = React.useState(false);
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
+  const [rowsPerPage, setRowsPerPage] = React.useState(offset);
   // -------------divider----------------
   const [allUser, setAllUser] = useState([]);
-  const [statusType, setStatusType] = useState('Approved');
+  const [dbSortBy, setDbSortBy] = useState('updatedAt');
+  const [dbOrderBy, setDbOrderBy] = useState(-1);
+  const [pageVisited, setPageVisited] = useState([0]);
+  const [openModal, setOpenModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [openEditUserModal, setOpenEditUserModal] = useState(false);
-  const [openCreateUserModal, setOpenCreateUserModal] = useState(false);
   const [rerenderComponent, setRerenderComponent] = useState(false);
-  const [userForModal, setUserForModal] = useState({
+  const [currentUser, setCurrentUser] = useState({
     name: "",
     email: "",
     status: "",
+    rejectionMessage: "",
   });
 
   useEffect(() => {
     async function fetchData() {
-      let data = await fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/user/get?status=${statusType}`);
-      let parsedData = await data.json();
-      let allusers = parsedData.allUser;
-      await setAllUser(allusers);
-      setLoading(false);
+      try {
+        const response = await axios.get(`/api/user/get`, {
+          params: {
+            status: 'Pending',
+            page: page,
+            offset: offset,
+            sortBy: dbSortBy,
+            orderBy: dbOrderBy,
+          }
+        })
+        const parsedData = response.data;
+        const allusers = parsedData.allUser;
+        await Promise.all([
+          setTotalUsers(parsedData.totalUsers),
+          setAllUser(Array.from(allusers))
+        ]);
+
+        setLoading(false);
+      } catch (error) {
+        console.error(error);
+      }
     }
+
     fetchData();
     //eslint-disable-next-line
-  }, [rerenderComponent])
+  }, [rerenderComponent, offset])
+
+  const updateData = async (newPage) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/user/get`, {
+        params: {
+          status: 'Pending',
+          page: newPage,
+          offset: offset,
+          sortBy: dbSortBy,
+          orderBy: dbOrderBy,
+        }
+      });
+      const parsedData = response.data;
+      const allusers = parsedData.allUser;
+
+      await Promise.all([
+        setTotalUsers(parsedData.totalUsers),
+        setAllUser(allUser.concat(Array.from(allusers)))
+      ]);
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setLoading(false);
+    }
+  };
+
+  const initialValues = {
+    dbSortBy,
+    dbOrderBy,
+  }
+
+  const { values, handleChange, handleSubmit } = useFormik({
+    initialValues: initialValues,
+    onSubmit: async (values) => {
+      setDbOrderBy(values.dbOrderBy)
+      setDbSortBy(values.dbSortBy)
+      setPageVisited([0])
+      setPage(0)
+      setAllUser([])
+      setLoading(true)
+      setRerenderComponent(!rerenderComponent)
+    }
+  })
 
   function createData(name, email, status, actionObject) {
     return {
@@ -264,11 +376,17 @@ export default function AllusersTable() {
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
+    if (!pageVisited.includes(newPage)) {
+      updateData(newPage)
+      pageVisited.push(newPage);
+    }
   };
 
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
+    setOffset(parseInt(event.target.value, 10))
     setPage(0);
+    setPageVisited([0]);
   };
 
   const handleChangeDense = (event) => {
@@ -280,208 +398,135 @@ export default function AllusersTable() {
   // Avoid a layout jump when reaching the last page with Userty rows.
   const UsertyRows = page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows.length) : 0;
 
-  // -----Start EditUser modal functions-----
-  const handleEditUser = (userObj) => {
-    setUserForModal({
-      name: "",
-      email: "",
-      status: "",
-      ...userObj,
-    });
-    setOpenEditUserModal(!openEditUserModal);
-  };
-
-  const handleEditUserSave = (e, userObj) => {
+  const handleApprovedUser = async (e, userObj) => {
     e.preventDefault();
-    fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/user/patch`, {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      method: "PATCH",
-
-      // Fields that to be updated are passed
-      body: JSON.stringify(userObj),
-    })
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (data) {
-        if (data.success) {
-          toast.success("User Updated Sucessfully!", {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-          setRerenderComponent(!rerenderComponent);
-          closeModal();
-        }
-        else {
-          toast.error(data.error, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-        }
+    try {
+      const response = await axios.patch('/api/user/patch', {
+        ...userObj,
+        status: 'Approved',
+      }, {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
       });
+      const data = response.data;
+      if (data.success) {
+        toast.success('User Approved Successfully!', {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
+        setRerenderComponent(!rerenderComponent);
+        closeModal();
+      } else {
+        toast.error(data.error, {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
   };
-  // -----End EditUser modal functions-----
 
-  // -----Start CreateUser modal functions-----
-  const handleCreateUser = () => {
-    setUserForModal({
-      name: "",
-      email: "",
-      status: "",
-      password: "",
-    });
-    setOpenCreateUserModal(!openCreateUserModal);
-  };
-
-  const handleCreateUserNew = (e, UserObj) => {
+  const handleRejectUser = async (e, userObj) => {
     e.preventDefault();
-    fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/user/post`, {
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-
-      // Fields that to be updated are passed
-      body: JSON.stringify(UserObj),
-    })
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (data) {
-        if (data.success) {
-          toast.success("User Created Sucessfully!", {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-          setRerenderComponent(!rerenderComponent);
-          closeModal();
-        } else {
-          toast.error(data.error, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-        }
-      })
-      .catch((err) => {
-        console.error(err);
+    try {
+      const response = await axios.patch('/api/user/patch', {
+        ...userObj,
+        status: 'Rejected',
+      }, {
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
       });
+      const data = response.data;
+      if (data.success) {
+        toast.success('User Rejected Successfully!', {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
+        setRerenderComponent(!rerenderComponent);
+        closeModal();
+      } else {
+        toast.error(data.error, {
+          position: 'top-right',
+          autoClose: 3000,
+          hideProgressBar: false,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          progress: undefined,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    }
   };
-  // -----End CreateUser modal functions-----
 
-  const handleDeleteUser = (userObj) => {
-    let id = userObj._id;
-    fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/user/delete/?id=${id}`, {
-      method: "DELETE"
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          setAllUser(allUser.filter((user) => user._id !== userObj._id));
-          toast.success("User Deleted Sucessfully!", {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-        }
-        else {
-          toast.error(data.error, {
-            position: "top-right",
-            autoClose: 3000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-            progress: undefined,
-          });
-        }
-      })
-  };
+  const handleRejectionMessage = (e) => {
+    setCurrentUser({
+      ...currentUser,
+      rejectionMessage: e.target.value,
+    });
+  }
 
   // -----Start Modal handlers-----
   const closeModal = () => {
-    setUserForModal({});
-    setOpenEditUserModal(false);
-    setOpenCreateUserModal(false);
+    setOpenModal(false);
+    setCurrentUser({
+      name: "",
+      email: "",
+      status: "", 
+      rejectionMessage: "",
+    })
   };
-
-  const handleUserChange = (e) => {
-    if (e.target.name === "status") {
-      setUserForModal({ ...userForModal, status: e.target.value });
-    }
-    else {
-      setUserForModal({ ...userForModal, [e.target.id]: e.target.value });
-    }
-  }
-
-  const handleStatusType = (e) => {
-    if (e.target.name === "status") {
-      setStatusType(e.target.value);
-      setRerenderComponent(!rerenderComponent)
-    }
-  }
 
   return (
     <div>
-      {openEditUserModal && (
+      {openModal && (
         <Modal
-          title="Edit User Info"
-          endTitle="Save Changes"
-          handleSubmit={(e) => { handleEditUserSave(e, userForModal) }}
+          title="User Rejection Message"
+          endTitle="Reject User"
+          handleSubmit={(e) => { handleRejectUser(e, currentUser) }}
           onClose={closeModal}
-          showmodal={openEditUserModal}
+          showmodal={openModal}
           hasfooter={"true"}
         >
-          <EditUser user={userForModal} onFieldChange={handleUserChange} />
-        </Modal>
-      )}
-      {openCreateUserModal && (
-        <Modal
-          title="Create New User"
-          endTitle="Create User"
-          handleSubmit={(e) => handleCreateUserNew(e, userForModal)}
-          onClose={closeModal}
-          showmodal={openCreateUserModal}
-          hasfooter={"true"}
-        >
-          <CreateUser user={userForModal} onFieldChange={handleUserChange} />
+          <TextareaAutosize
+            minRows={4} 
+            placeholder="Rejection Message..."
+            value={(currentUser.rejectionMessage) ? currentUser.rejectionMessage : ""}
+            onChange={handleRejectionMessage}
+            required
+            className="w-full p-2"
+          />
         </Modal>
       )}
 
       <Box sx={{ width: "100%" }}>
-        <Paper sx={{ width: "100%", mb: 2 }}>
-          <AllusersTableToolbar
+        <Paper sx={{ width: "100%", mb: 2 }} className='p-3 mt-3'>
+          <PendingusersTableToolbar
             numSelected={selected.length}
-            handleCreateUser={handleCreateUser}
-            handleStatusType={handleStatusType}
-            statusType={statusType}
+            values={values}
+            handleChange={handleChange}
+            handleSubmit={handleSubmit}
           />
           <TableContainer>
             <Table
@@ -489,7 +534,7 @@ export default function AllusersTable() {
               aria-labelledby="tableTitle"
               size={dense ? "small" : "medium"}
             >
-              <AllusersTableHead
+              <PendingusersTableHead
                 numSelected={selected.length}
                 order={order}
                 orderBy={orderBy}
@@ -526,31 +571,28 @@ export default function AllusersTable() {
                         <TableCell>{row.status}</TableCell>
                         <TableCell>
                           <div className="flex space-x-4 text-xl">
-                            <AiFillEdit
-                              onClick={() => handleEditUser(row.actionObject)}
-                              className="cursor-pointer"
+                            <CheckCircleIcon
+                              onClick={(e) => handleApprovedUser(e, row.actionObject)}
+                              className="cursor-pointer text-green-600"
                             />
-                            <MdDeleteForever
-                              className="cursor-pointer"
-                              onClick={() =>
-                                window.confirm(
-                                  "Do you want to delete this User?"
-                                ) === true
-                                  ? handleDeleteUser(row.actionObject)
-                                  : ""
-                              }
+                            <CancelIcon
+                              className="cursor-pointer font-bold text-red-500"
+                              onClick={() => {
+                                setCurrentUser(row.actionObject)
+                                setOpenModal(!openModal)
+                              }}
                             />
                           </div>
                         </TableCell>
                       </TableRow>
                     );
-                  }) : (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center">
-                      No data available
-                    </TableCell>
-                  </TableRow>
-                )}
+                  }) : !loading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center">
+                        No data available
+                      </TableCell>
+                    </TableRow>
+                  )}
                 {UsertyRows > 0 && (
                   <TableRow
                     style={{
@@ -571,7 +613,7 @@ export default function AllusersTable() {
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
-            count={rows.length}
+            count={totalUsers}
             rowsPerPage={rowsPerPage}
             page={page}
             onPageChange={handleChangePage}

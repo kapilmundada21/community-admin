@@ -5,6 +5,7 @@ const AdminSchema = new mongoose.Schema({
     email: { type: String, required: true, unique:true },
     password: { type: String },
     type: { type: String, required: true, default: 'Supervisor' },
+    setPasswordToken: { type: String }
 }, { timestamps: true });
 
 mongoose.models = {}

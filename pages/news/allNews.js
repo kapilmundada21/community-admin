@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Grid from "@mui/material/Grid";
 import { CircularProgress, Fab, FormControl, InputLabel, MenuItem, Select, Tooltip } from '@mui/material';
 import AddIcon from "@mui/icons-material/Add";
+import axios from 'axios';
 import NewsCard from "@/components/NewsCard";
 import Modal from "@/components/Modal";
 import NewsModal from '@/components/Modals/NewsModal';
@@ -14,10 +15,13 @@ export default function AllNews() {
     const [allNews, setAllNews] = useState([]);
     const [page, setPage] = useState(0);
     const [offset, setOffset] = useState(8);
+    const [dbSortBy, setDbSortBy] = useState('updatedAt');
+    const [dbOrderBy, setDbOrderBy] = useState(-1);
     const [totalNews, setTotalNews] = useState(8);
     const [loading, setLoading] = useState(true);
     const [openEditModal, setOpenEditModal] = useState(false);
     const [openCreateModal, setOpenCreateModal] = useState(false);
+    const [openDeleteModal, setOpenDeleteModal] = useState(false);
     const [rerenderComponent, setRerenderComponent] = useState(false);
     const [newsForModal, setNewsForModal] = useState({
         title: "",
@@ -29,12 +33,23 @@ export default function AllNews() {
 
     useEffect(() => {
         async function fetchData() {
-            let URL = `${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/get?status=${statusType}&page=${page}&offset=${offset}`
-            let data = await fetch(URL);
-            let parsedData = await data.json();
-            await setAllNews(Array.from(parsedData.allNews));
-            await setTotalNews(parsedData.totalNews);
-            setLoading(false);
+            try {
+                const response = await axios.get(`/api/news/get`, {
+                    params: {
+                        status: statusType,
+                        page: page,
+                        offset: offset,
+                        sortBy: dbSortBy,
+                        orderBy: dbOrderBy,
+                    }
+                });
+                const parsedData = response.data;
+                await setAllNews(Array.from(parsedData.allNews));
+                await setTotalNews(parsedData.totalNews);
+                setLoading(false);
+            } catch (error) {
+                console.error(error);
+            }
         }
         fetchData();
         //eslint-disable-next-line
@@ -49,15 +64,27 @@ export default function AllNews() {
     }
 
     const updateData = async () => {
-        setLoading(true);
-        let url = `${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/get?status=${statusType}&page=${page + 1}&offset=${offset}`;
-        setPage(page + 1);
-        let data = await fetch(url);
-        let parsedData = await data.json();
-        setAllNews(allNews.concat(Array.from(parsedData.allNews)));
-        setTotalNews(parsedData.totalNews);
-        setLoading(false);
-    }
+        try {
+            setLoading(true);
+            setPage(page + 1);
+            const response = await axios.get(`/api/news/get`, {
+                params: {
+                    status: statusType,
+                    page: page+1,
+                    offset: offset,
+                    sortBy: dbSortBy,
+                    orderBy: dbOrderBy,
+                }
+            });
+            const parsedData = response.data;
+            setAllNews(allNews.concat(Array.from(parsedData.allNews)));
+            setTotalNews(parsedData.totalNews);
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching data:', error);
+            setLoading(false);
+        }
+    };
 
     // -----Start EditNews modal functions-----
     const handleEditNews = (newsObj) => {
@@ -72,48 +99,43 @@ export default function AllNews() {
         setOpenEditModal(!openEditModal);
     };
 
-    const handleEditNewsSave = (e, newsObj) => {
+    const handleEditNewsSave = async (e, newsObj) => {
         e.preventDefault();
-        fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/patch`, {
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-            },
-            method: "PATCH",
-
-            // Fields that to be updated are passed
-            body: JSON.stringify(newsObj),
-        })
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (data) {
-                if (data.success) {
-                    toast.success("News Updated Sucessfully!", {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                    setRerenderComponent(!rerenderComponent);
-                    setPage(0);
-                    closeModal();
-                }
-                else {
-                    toast.error(data.error, {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                }
+        try {
+            const response = await axios.patch('/api/news/patch', newsObj, {
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
             });
+            const data = response.data;
+            if (data.success) {
+                toast.success('News Updated Successfully!', {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+                setRerenderComponent(!rerenderComponent);
+                setPage(0);
+                closeModal();
+            } else {
+                toast.error(data.error, {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+            }
+        } catch (error) {
+            console.error(error);
+        }
     };
     // -----End EditNews modal functions-----
 
@@ -129,91 +151,99 @@ export default function AllNews() {
         setOpenCreateModal(!openCreateModal);
     };
 
-    const handleCreateNewsNew = (e, newsObj) => {
+    const handleCreateNewsNew = async (e, newsObj) => {
         e.preventDefault();
-        fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/post`, {
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-            },
-            method: "POST",
-
-            // Fields that to be updated are passed
-            body: JSON.stringify(newsObj),
-        })
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (data) {
-                if (data.success) {
-                    toast.success("News Created Sucessfully!", {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                    setRerenderComponent(!rerenderComponent);
-                    setPage(0);
-                    closeModal();
-                } else {
-                    toast.error(data.error, {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                }
-            })
-            .catch((err) => {
-                console.error(err);
+        try {
+            const response = await axios.post('/api/news/post', newsObj, {
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
             });
+            const data = response.data;
+            if (data.success) {
+                toast.success('News Created Successfully!', {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+                setRerenderComponent(!rerenderComponent);
+                setPage(0);
+                closeModal();
+            } else {
+                toast.error(data.error, {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+            }
+        } catch (error) {
+            console.error(error);
+        }
     };
     // -----End CreateNews modal functions-----
 
-    const handleDeleteNews = (newsObj) => {
-        let id = newsObj._id;
-        fetch(`${process.env.NEXT_PUBLIC_ADMIN_HOST}/api/news/delete/?id=${id}`, {
-            method: "DELETE"
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                if (data.success) {
-                    setAllNews(allNews.filter((news) => news._id !== newsObj._id));
-                    toast.success("News Deleted Sucessfully!", {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                }
-                else {
-                    toast.error(data.error, {
-                        position: "top-right",
-                        autoClose: 3000,
-                        hideProgressBar: false,
-                        closeOnClick: true,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                    });
-                }
-            })
+    const handleDeleteModel = (newsObj) => {
+        setNewsForModal({
+            title: "",
+            description: "",
+            img: "",
+            publishedBy: "",
+            status: "",
+            ...newsObj
+        });
+        setOpenDeleteModal(!openDeleteModal);
     };
 
+    const handleDeleteNews = async (e, newsObj) => {
+        e.preventDefault();
+
+        try {
+            const id = newsObj._id;
+            const response = await axios.delete(`/api/news/delete/?id=${id}`);
+            const data = response.data;
+            if (data.success) {
+                setAllNews(allNews.filter((news) => news._id !== newsObj._id));
+                setTotalNews(totalNews - 1);
+                toast.success('News Deleted Successfully!', {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+                closeModal();
+            } else {
+                toast.error(data.error, {
+                    position: 'top-right',
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    progress: undefined,
+                });
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
     // -----Start Modal handlers-----
     const closeModal = () => {
         setNewsForModal({});
         setOpenEditModal(false);
         setOpenCreateModal(false);
+        setOpenDeleteModal(false);
     };
 
     const handleNewsChange = (e) => {
@@ -227,7 +257,7 @@ export default function AllNews() {
 
     const footer = {
         handleEditNews,
-        handleDeleteNews,
+        handleDeleteModel,
     }
 
     return (
@@ -256,8 +286,18 @@ export default function AllNews() {
                     <NewsModal news={newsForModal} onFieldChange={handleNewsChange} />
                 </Modal>
             )}
+            {openDeleteModal && (
+                <Modal
+                    title="Conform Delete News"
+                    endTitle="Delete News"
+                    handleSubmit={(e) => handleDeleteNews(e, newsForModal)}
+                    onClose={closeModal}
+                    showmodal={openDeleteModal}
+                    hasfooter={"true"}
+                />
+            )}
 
-            <div className='flex fixed right-12 -mt-8 bg-white my-8 z-10 space-x-4'>
+            <div className='w-full md:w-min flex justify-between fixed md:right-12 -mt-0 p-4 md:-mt-3 md:p-0 bg-white my-8 z-10 space-x-4'>
                 <FormControl>
                     <InputLabel id="demo-simple-select-label">Status</InputLabel>
                     <Select
@@ -281,7 +321,7 @@ export default function AllNews() {
                 </Tooltip>
             </div>
 
-            <div className="mt-16">
+            <div className="px-5 md:my-16 mt-24">
                 <InfiniteScroll
                     dataLength={(page + 1) * offset}
                     next={updateData}
@@ -293,7 +333,7 @@ export default function AllNews() {
                         columns={{ xs: 1, sm: 8, md: 12 }}
                     >
                         {allNews.map((news, index) => (
-                            <Grid item xs={2} sm={4} md={3} key={index}>
+                            <Grid item xs={2} sm={4} md={3} key={index} className='flex justify-center'>
                                 <NewsCard news={allNews[index]} footer={footer} />
                             </Grid>
                         ))}
@@ -302,7 +342,7 @@ export default function AllNews() {
 
 
                 {
-                    !(allNews.length) &&
+                    !(allNews.length) && !loading &&
                     <div className='md:pt-16 text-center'>
                         No data available
                     </div>
